@@ -1,0 +1,17 @@
+PATH
+  remote: .
+  specs:
+    net-ssh-socks (0.0.1)
+      net-ssh (~> 2.0.0)
+
+GEM
+  remote: http://rubygems.org/
+  specs:
+    net-ssh (2.0.23)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  net-ssh (~> 2.0.0)
+  net-ssh-socks!
