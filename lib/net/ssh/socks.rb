@@ -78,8 +78,19 @@ module Net
 
         [remote_host, remote_port]
       end
-
     end
+  end
+end
+
+class Net::SSH::Connection::Session
+  def on_close(&block)
+    @on_close = block
+  end
+
+  alias_method :close_without_callbacks, :close
+  def close
+    close_without_callbacks
+    @on_close.call if @on_close
   end
 end
 
@@ -124,6 +135,11 @@ class Net::SSH::Service::Forward
         error { "could not establish direct channel: #{description} (#{code})" }
         client.close
       end
+    end
+
+    session.on_close do
+      debug { "cleaning up socks server" }
+      socks_server.close
     end
   end
 end
