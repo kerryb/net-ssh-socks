@@ -5,7 +5,6 @@ module Net
     class Socks
       VERSION = "0.0.1"
 
-      SOCKS_VERSION  = 5
       METHOD_NO_AUTH = 0
       CMD_CONNECT    = 1
       REP_SUCCESS    = 0
@@ -13,6 +12,9 @@ module Net
       ATYP_IPV4      = 1
       ATYP_DOMAIN    = 3
       ATYP_IPV6      = 4
+      SOCKS4         = 4
+      SOCKS4_SUCCESS = [0, 0x5a, 0, 0, 0, 0, 0, 0].pack("C*")
+      SOCKS5         = 5
 
       # client is an open socket
       def initialize(client)
@@ -22,13 +24,32 @@ module Net
       # Communicates with a client application as described by the SOCKS 5
       # specification: http://tools.ietf.org/html/rfc1928 and
       # http://en.wikipedia.org/wiki/SOCKS
-      #
       # returns the host and port requested by the client
       def client_handshake
-        version, nmethods, *methods = @client.recv(8).unpack("C*")
+        version = @client.recv(1).unpack("C*").first
+        case version
+        when SOCKS4 : client_handshake_v4
+        when SOCKS5 : client_handshake_v5
+        else
+          raise "SOCKS version not supported: #{version.inspect}"
+        end
+      end
+
+      def client_handshake_v4
+        command = @client.recv(1)
+        port = @client.recv(2).unpack("n").first
+        ip_addr = @client.recv(4).unpack("C*").join('.')
+        username = @client.recv(1024) # read the rest of the stream
+
+        @client.send SOCKS4_SUCCESS, 0
+        [ip_addr, port]
+      end
+
+      def client_handshake_v5
+        nmethods, *methods = @client.recv(8).unpack("C*")
 
         if methods.include?(METHOD_NO_AUTH)
-          packet = [SOCKS_VERSION, METHOD_NO_AUTH].pack("C*")
+          packet = [SOCKS5, METHOD_NO_AUTH].pack("C*")
           @client.send packet, 0
         else
           @client.close
@@ -37,7 +58,7 @@ module Net
 
         version, command, reserved, address_type, *destination = @client.recv(256).unpack("C*")
 
-        packet = ([SOCKS_VERSION, REP_SUCCESS, RESERVED, address_type] + destination).pack("C*")
+        packet = ([SOCKS5, REP_SUCCESS, RESERVED, address_type] + destination).pack("C*")
         @client.send packet, 0
 
         remote_host, remote_port = case address_type
@@ -51,6 +72,8 @@ module Net
         when ATYP_IPV6
           @client.close
           raise 'Unsupported address type. Only "IPv4" is supported'
+        else
+          raise "Unknown address_type: #{address_type}"
         end
 
         [remote_host, remote_port]
@@ -82,21 +105,23 @@ class Net::SSH::Service::Forward
     bind_address = "127.0.0.1"
     bind_address = args.shift if args.first.is_a?(String) && args.first =~ /\D/
     local_port   = args.shift.to_i
+    info { "socks on #{bind_address} port #{local_port}" }
 
-    socket = TCPServer.new(bind_address, local_port)
-    session.listen_to(socket) do |socket|
-      client = socket.accept
+    socks_server = TCPServer.new(bind_address, local_port)
+    session.listen_to(socks_server) do |server|
+      client = server.accept
 
       socks = Net::SSH::Socks.new(client)
       remote_host, remote_port = socks.client_handshake
+      info { "connection requested on #{remote_host} port #{remote_port}" }
 
       channel = session.open_channel("direct-tcpip", :string, remote_host, :long, remote_port, :string, bind_address, :long, local_port) do |channel|
-        channel.info { "direct channel established" }
+        info { "direct channel established" }
         prepare_client(client, channel, :local)
       end
 
       channel.on_open_failed do |ch, code, description|
-        channel.error { "could not establish direct channel: #{description} (#{code})" }
+        error { "could not establish direct channel: #{description} (#{code})" }
         client.close
       end
     end
