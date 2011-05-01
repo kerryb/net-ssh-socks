@@ -28,8 +28,8 @@ module Net
       def client_handshake
         version = @client.recv(1).unpack("C*").first
         case version
-        when SOCKS4 : client_handshake_v4
-        when SOCKS5 : client_handshake_v5
+        when SOCKS4 then client_handshake_v4
+        when SOCKS5 then client_handshake_v5
         else
           raise "SOCKS version not supported: #{version.inspect}"
         end
