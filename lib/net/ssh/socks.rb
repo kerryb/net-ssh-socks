@@ -3,7 +3,7 @@ require 'net/ssh'
 module Net
   module SSH
     class Socks
-      VERSION = "0.0.2"
+      VERSION = "0.0.3"
 
       METHOD_NO_AUTH = 0
       CMD_CONNECT    = 1
