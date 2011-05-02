@@ -67,8 +67,9 @@ module Net
           port = destination[-2..-1].pack('C*').unpack('n')
           [host, port]
         when ATYP_DOMAIN
-          @client.close
-          raise 'Unsupported address type. Only "IPv4" is supported'
+          host = destination[1..-3].pack('C*')
+          port = destination[-2..-1].pack('C*').unpack('n')
+          [host, port]
         when ATYP_IPV6
           @client.close
           raise 'Unsupported address type. Only "IPv4" is supported'
