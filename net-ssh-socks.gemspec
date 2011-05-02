@@ -3,7 +3,7 @@ $:.push File.expand_path("../lib", __FILE__)
 require 'net/ssh/socks'
 
 Gem::Specification.new do |s|
-  s.name        = "net-ssh-socks"
+  s.name        = "kerryb-net-ssh-socks"
   s.version     = Net::SSH::Socks::VERSION
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Mike Enriquez"]
